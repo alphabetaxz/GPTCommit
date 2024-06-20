@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Set your OpenAI API key
-OPENAI_API_KEY="your_openai_api_key_here"
+OPENAI_API_KEY="${AUTO_COMMIT_OPENAI_API_KEY}"
 # Set your OpenAI API endpoint
-OPENAI_API_ENDPOINT="https://api.openai.com/v1/chat/completions"
+OPENAI_API_ENDPOINT="https://${AUTO_COMMIT_OPENAI_API_HOST}/v1/chat/completions"
 # Set your Proxy, default using HTTPS_PROXY environment variable
 CURL_PROXY=""
 
@@ -101,12 +101,20 @@ if [ -z "$COMMIT_MESSAGE" ]; then
     exit 1
 fi
 
-# Add changes to the staging area
-git add .
-
-# Commit the changes
-git commit -m "$COMMIT_MESSAGE"
-
 echo "Commit complete with message: "
 echo " "
 echo "$COMMIT_MESSAGE"
+
+echo "Do you want to continue commit? (Y/N)"
+read answer
+
+if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
+    # Add changes to the staging area
+    git add .
+
+    # Commit the changes
+    git commit -m "$COMMIT_MESSAGE"
+else
+    echo "Exiting the script."
+    exit 0
+fi
