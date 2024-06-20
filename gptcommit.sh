@@ -4,6 +4,7 @@
 OPENAI_API_KEY="${AUTO_COMMIT_OPENAI_API_KEY}"
 # Set your OpenAI API endpoint
 OPENAI_API_ENDPOINT="https://${AUTO_COMMIT_OPENAI_API_HOST}/v1/chat/completions"
+OPENAI_MODEL="${AUTO_COMMIT_MODEL}"
 # Set your Proxy, default using HTTPS_PROXY environment variable
 CURL_PROXY=""
 
@@ -20,6 +21,7 @@ CONFIRMATION_FILE="$HOME/.gptcommit_confirmed"
 
 # ANSI color codes
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 # Parse command-line arguments
@@ -61,39 +63,39 @@ if [ -z "$DIFF" ]; then
     exit 0
 fi
 
+echo $OPENAI_MODEL
+
 # Call OpenAI's API to generate a commit message
-generate_commit_message() {
-    local LANGUAGES=$1
-    RESPONSE=$(jq -n --arg diff "$DIFF" --arg lang "$LANGUAGES" '{
-        model: "gpt-4o",
-        messages: [
-            {
-                role: "user",
-                content: "Analyze the following code changes and generate a concise Git commit message, providing it in the following languages: \($lang). Text only: \n\n\($diff)\n\n"
-            }
-        ],
-        max_tokens: 500,
-        temperature: 0.7
-    }' | curl $CURL_PROXY_OPT --connect-timeout 5 -s "$OPENAI_API_ENDPOINT" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $OPENAI_API_KEY" \
-    -d @-)
+RESPONSE=$(jq -n --arg diff "$DIFF" --arg lang "$LANGUAGES" --arg model "$OPENAI_MODEL" '{
+    model: "\($model)",
+    messages: [
+        {
+            role: "user",
+            content: "Analyze the following code changes and generate a concise Git commit message, providing it in the following languages: \($lang). Text only: \n\n\($diff)\n\n"
+        }
+    ],
+    max_tokens: 500,
+    temperature: 0.7
+}' | curl $CURL_PROXY_OPT --connect-timeout 30 -s "$OPENAI_API_ENDPOINT" \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer $OPENAI_API_KEY" \
+-d @-)
 
-    if [ $? -ne 0 ]; then
-        echo "Error: OpenAI API call failed due to network error."
-        exit 1
-    fi
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Error: OpenAI API call failed due to network error.${NC}"
+    exit 1
+fi
 
-    if [ -z "$RESPONSE" ] || [ "$(echo "$RESPONSE" | jq -r '.error')" != "null" ]; then
-        echo "Error: OpenAI API returned an error."
-        exit 1
-    fi
+if [ -z "$RESPONSE" ] || [ "$(echo "$RESPONSE" | jq -r '.error')" != "null" ]; then
+    echo -e "${RED}Error: OpenAI API returned an error.${NC}"
+    echo "$RESPONSE" | jq -r '.error.message'
+    exit 1
+fi
 
-    echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed 's/^"\(.*\)"$/\1/'
-}
+COMMIT_MESSAGE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed 's/^"\(.*\)"$/\1/')
 
 # Get the generated commit message
-COMMIT_MESSAGE=$(generate_commit_message "$LANGUAGES")
+# COMMIT_MESSAGE=$(generate_commit_message "$LANGUAGES")
 
 # If no commit message is generated, exit
 if [ -z "$COMMIT_MESSAGE" ]; then
@@ -101,11 +103,10 @@ if [ -z "$COMMIT_MESSAGE" ]; then
     exit 1
 fi
 
-echo "Commit complete with message: "
-echo " "
-echo "$COMMIT_MESSAGE"
+echo "Will Commit with message: "
+echo -e "${GREEN}$COMMIT_MESSAGE${NC}"
 
-echo "Do you want to continue commit? (Y/N)"
+echo "Do you want to continue? (Y/N)"
 read answer
 
 if [ "$answer" == "Y" ] || [ "$answer" == "y" ]; then
