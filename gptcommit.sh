@@ -16,6 +16,8 @@ fi
 
 # Default language for commit message
 LANGUAGES="en"
+PREFIX=""
+SUFFIX=""
 # File to store user confirmation
 CONFIRMATION_FILE="$HOME/.gptcommit_confirmed"
 
@@ -28,6 +30,8 @@ NC='\033[0m' # No Color
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --lang=*) LANGUAGES="${1#*=}";;
+        --prefix=*) PREFIX="${1#*=}";;
+        --suffix=*) SUFFIX="${1#*=}";;
         *) echo "Unknown parameter passed: $1"; exit 1;;
     esac
     shift
@@ -104,7 +108,7 @@ if [ -z "$COMMIT_MESSAGE" ]; then
 fi
 
 echo "Will Commit with message: "
-echo -e "${GREEN}$COMMIT_MESSAGE${NC}"
+echo -e "${GREEN}$PREFIX$COMMIT_MESSAGE$SUFFIX${NC}"
 
 echo "Do you want to continue? (Y/N)"
 read answer
